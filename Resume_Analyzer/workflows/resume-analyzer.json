@@ -1,0 +1,180 @@
+{
+  "name": "Resume vs JD Analyzer",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Resume vs JD Analyzer",
+        "formDescription": "Upload your resume (PDF) and paste a job description to get an instant fit analysis.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email"
+            },
+            {
+              "fieldLabel": "Resume",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Job Description",
+              "fieldType": "textarea",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "3f1c9a52-7b1e-4c8a-9d2f-1a6e5b7c8d01",
+      "name": "n8n Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 0],
+      "webhookId": "b7d4e2a1-5c3f-4e8b-a9d6-2f1e0c7b3a45"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Resume",
+        "options": {}
+      },
+      "id": "a2b8c4d6-1e3f-4a5b-8c7d-9e0f1a2b3c02",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert technical recruiter. Compare the candidate's resume against the job description.\n\nCandidate name (from form): {{ $('n8n Form Trigger').item.json.Name }}\n\n### RESUME\n{{ $json.text }}\n\n### JOB DESCRIPTION\n{{ $('n8n Form Trigger').item.json['Job Description'] }}\n\nInstructions:\n- matching_skills: skills/requirements in the JD that the resume clearly shows.\n- missing_skills: skills/requirements in the JD that the resume lacks or does not mention.\n- fit_score: integer from 1 (poor fit) to 10 (excellent fit).\n- top_3_improvements: exactly 3 concrete, actionable changes to the resume for this JD.\n- summary: 2-3 sentence overall assessment.",
+        "hasOutputParser": true
+      },
+      "id": "c4d6e8f0-2a4b-4c6d-8e0f-1b3c5d7e9f03",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "d5e7f9a1-3b5c-4d7e-9f1a-2c4d6e8f0a04",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [380, 220]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"name\": { \"type\": \"string\" },\n    \"matching_skills\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"missing_skills\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"fit_score\": { \"type\": \"integer\", \"minimum\": 1, \"maximum\": 10 },\n    \"top_3_improvements\": { \"type\": \"array\", \"items\": { \"type\": \"string\" }, \"minItems\": 3, \"maxItems\": 3 },\n    \"summary\": { \"type\": \"string\" }\n  },\n  \"required\": [\"name\", \"matching_skills\", \"missing_skills\", \"fit_score\", \"top_3_improvements\", \"summary\"]\n}"
+      },
+      "id": "e6f8a0b2-4c6d-4e8f-a0b2-3d5e7f9a1b05",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [560, 220]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toFormat('yyyy-MM-dd HH:mm:ss') }}",
+            "Name": "={{ $('n8n Form Trigger').item.json.Name }}",
+            "Email": "={{ $('n8n Form Trigger').item.json.Email }}",
+            "Fit Score": "={{ $json.output.fit_score }}",
+            "Matching Skills": "={{ $json.output.matching_skills.join(', ') }}",
+            "Missing Skills": "={{ $json.output.missing_skills.join(', ') }}",
+            "Summary": "={{ $json.output.summary }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Name", "displayName": "Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Email", "displayName": "Email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Fit Score", "displayName": "Fit Score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Matching Skills", "displayName": "Matching Skills", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Missing Skills", "displayName": "Missing Skills", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Summary", "displayName": "Summary", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f7a9b1c3-5d7e-4f9a-b1c3-4e6f8a0b2c06",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [800, 0]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "=Your Fit Score: {{ $('Basic LLM Chain').item.json.output.fit_score }}/10",
+        "completionMessage": "=## Fit Score: {{ $('Basic LLM Chain').item.json.output.fit_score }}/10\n\n{{ $('Basic LLM Chain').item.json.output.summary }}\n\n### Missing Skills\n- {{ $('Basic LLM Chain').item.json.output.missing_skills.join('\\n- ') }}\n\n### Top 3 Improvements\n1. {{ $('Basic LLM Chain').item.json.output.top_3_improvements[0] }}\n2. {{ $('Basic LLM Chain').item.json.output.top_3_improvements[1] }}\n3. {{ $('Basic LLM Chain').item.json.output.top_3_improvements[2] }}",
+        "options": {}
+      },
+      "id": "a8b0c2d4-6e8f-4a0b-c2d4-5f7a9b1c3d07",
+      "name": "Form",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [1020, 0],
+      "webhookId": "c9e5f3b2-6d4a-4f9c-b0e7-3a2f1d8c4b56"
+    }
+  ],
+  "connections": {
+    "n8n Form Trigger": {
+      "main": [[{ "node": "Extract from File", "type": "main", "index": 0 }]]
+    },
+    "Extract from File": {
+      "main": [[{ "node": "Basic LLM Chain", "type": "main", "index": 0 }]]
+    },
+    "Basic LLM Chain": {
+      "main": [[{ "node": "Google Sheets", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets": {
+      "main": [[{ "node": "Form", "type": "main", "index": 0 }]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{ "node": "Basic LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [[{ "node": "Basic LLM Chain", "type": "ai_outputParser", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
